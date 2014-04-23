@@ -1,171 +1,54 @@
-yii-ycm
-=====================
+# yii-ycm with bridges #
 
-YCM - Yii Content Management module
-
-- [Documentation](http://janisto.github.com/yii-ycm/)
+- [Original module](http://janisto.github.com/yii-ycm/)
 - [Examples](http://janisto.github.com/yii-ycm/)
-- [Github Project Page](https://github.com/janisto/yii-ycm/)
-- [Forum topic](http://www.yiiframework.com/forum/index.php/topic/37136-module-ycm-yii-content-management-module/)
 
-See examples for all the options.
+# Bridges #
 
-Requirements
-------------------
+YCM is perfect module, but i had some difficulties, when i tried make some integration with third-party widgets. (Originally all widgets provided by yii-ycm were hardcoded in main class of module)
 
-- Yii 1.1.10 or above (Requires jQuery 1.7.1)
+I tried to do something with that, and as result i created "bridge api" for widgets. 
 
-Installation
-------------------
+`See bridges folder.`
 
-- Download yii-ycm or clone the files to `protected/modules/ycm`
-- Edit Yii main configuration file `protected/config/main.php`. Enable module, set username, password and models you want to manage.
+## Bridge using examples: ##
 
-~~~
-	'modules'=>array(
-		...
-		'ycm'=>array(
-			'username'=>'YOUR USERNAME',
-			'password'=>'YOUR PASSWORD',
-			'registerModels'=>array(
-				//'application.models.Blog', // one model
-				'application.models.*', // all models in folder
-			),
-			'uploadCreate'=>true, // create upload folder automatically
-			'redactorUpload'=>true, // enable Redactor image upload
-		),
-		...
-	),
-~~~
+For example we want to use [jqueryte](http://www.yiiframework.com/extension/ejqueryte) extension for our model attribute:
 
-You can also use [composer](http://getcomposer.org/doc/).
+1) create JqueryBridge.php in ext.jqueryte.ycm_bridge folder:
+```php
+<?php
 
-- Require the package.
+    class JqueryteBridge extends AbstractYCMBridge {
 
-~~~
-{
-	"name": "app-name",
-	"description": "App description",
-	"type": "project",
-	"prefer-stable": true,
-	"require": {
-		"php": ">=5.3.0",
-		"yiisoft/yii": "1.1.14",
-		"janisto/yii-ycm": "1.1.0",
+		public function render() {
+
+			$model = $this->getModel();
+			$attribute = $this->getAttribute();
+
+			$this->getController()->widget('application.widgets.jqueryte.Jqueryte', [
+				'model' => $model,
+				'attribute' => $attribute
+			]);
+
+		}
+
 	}
-}
-~~~
+```
+2) Add bridge alias to module config (config/main.php):
+```php
+'modules' => array(
+    'ycm' => array(
+        ...
+        'bridge_aliases' => array(
+       		'application.widgets.jqueryte.ycm_bridge',
+        )
+    )
+)
+```
+3) Setup attribute in attributeWidgets method (in model) :
+```php
+array('node_text','jqueryte')
+```
 
-- Add vendor path to your configuration file, enable module, set username, password and models you want to manage.
-
-~~~
-	'aliases'=>array(
-		'vendor'=>realpath(__DIR__ . '/../../vendor'),
-	),
-	'modules'=>array(
-		...
-		'ycm'=>array(
-			'class' =>'vendor.janisto.yii-ycm.YcmModule',
-			'username'=>'YOUR USERNAME',
-			'password'=>'YOUR PASSWORD',
-			'registerModels'=>array(
-				//'application.models.Blog', // one model
-				'application.models.*', // all models in folder
-			),
-			'uploadCreate'=>true, // create upload folder automatically
-			'redactorUpload'=>true, // enable Redactor image upload
-		),
-		...
-	),
-~~~
-
-- Add FileBehavior to your models if you are using file or image features. Add uploadPath and uploadUrl if you are not using the default uploads folder.
-
-~~~
-	...
-	function behaviors() {
-	    return array(
-			'file' => array(
-				'class'=>'application.modules.ycm.behaviors.FileBehavior',
-				//'uploadPath'=>'/optional/path/to/uploads',
-				//'uploadUrl'=>'http://optional.cdn.domain.com/uploads/path',
-			),
-	    );
-	}
-	...
-~~~
-
-- FileBehavior methods:
-
-~~~
-$model = new Model;
-echo $model->getFilePath('attribute');
-echo $model->getFileUrl('attribute');
-echo $model->getAbsoluteFileUrl('attribute');
-~~~
-
-Update
-------------------
-
-- Clear assets folder.
-
-Changelog
-------------------
-
-### v1.1.2
-
-- Improve FileBehavior
-- Update libraries.
-
-### v1.1.1
-
-- Fix time format.
-
-### v1.1.0
-
-- Add German translation.
-- Fix: behaviour class path.
-
-### v1.0.0
-
-- Fix: override options in all form widgets.
-- Add support for taggable behavior.
-- Add Chinese translation.
-- Update Finnish translation.
-- Improve Google Analytics statistics page.
-- Update libraries.
-- Update Composer support.
-
-### v0.5.0
-
-- Google Analytics statistics page.
-- Update yii-chosen to version v1.4.0
-- Update Redactor to 8.2.6
-- Composer support.
-- Fix: Better url & path handling.
-- Code cleanup.
-- Update Finnish translation.
-
-### v0.4.0
-
-- Update yii-chosen to version v1.1.0
-- Add first and last to pager.
-- Fix: allow auto login.
-
-
-### v0.3.0
-
-- Bootstrap typehead support.
-- Localization support and Finnish translation.
-- Fix: loadModel doesn't require PHP 5.3+ anymore.
-
-### v0.2.0
-
-- Initial version.
-
-License
-------------------
-
-yii-ycm is free and unencumbered [public domain][Unlicense] software.
-
-[Unlicense]: http://unlicense.org/
+4) PROFIT!
