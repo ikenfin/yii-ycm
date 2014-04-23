@@ -4,8 +4,8 @@
  * YcmModule
  * 
  * @uses CWebModule
- * @version 1.1.2
- * @copyright 2012-2014
+ * @version 1.1.0
+ * @copyright 2012-2013
  * @author Jani Mikkonen <janisto@php.net>
  * @license public domain
  */
@@ -14,6 +14,7 @@ class YcmModule extends CWebModule
 	private $controller;
 	private $_assetsUrl;
 	private $_modelsList=array();
+
 	protected $registerModels=array();
 	protected $excludeModels=array();
 	protected $attributesWidgets;
@@ -25,6 +26,12 @@ class YcmModule extends CWebModule
 	public $redactorUpload=false;
 	public $permissions=0774;
 	public $analytics=array();
+
+	public $bridge_interface = 'IYCMBridge';
+	public $bridge_aliases = array();
+	public $widget_aliases = array(
+		'widgets'
+	);
 
 	/**
 	 * Load model.
@@ -48,11 +55,7 @@ class YcmModule extends CWebModule
 				));
 			}
 		}
-		$model->attachBehavior('admin',array(
-			'class'=>$this->name.'.behaviors.FileBehavior',
-			'uploadPath'=>$this->uploadPath,
-			'uploadUrl'=>$this->uploadUrl,
-		));
+		$model->attachBehavior('admin',array('class'=>$this->name.'.behaviors.FileBehavior'));
 		return $model;
 	}
 
@@ -61,6 +64,10 @@ class YcmModule extends CWebModule
 	 */
 	public function init()
 	{
+		// user can add bridge to custom widgets in config
+		// here we connect default bridges:
+		$this->bridge_aliases[] = $this->name.'.bridges';
+	
 		if ($this->uploadPath===null) {
 			$path=Yii::getPathOfAlias('webroot').DIRECTORY_SEPARATOR.'uploads';
 			$this->uploadPath=realpath($path);
@@ -107,6 +114,10 @@ class YcmModule extends CWebModule
 		), true);
 	}
 
+	public function getController() {
+		return $this->controller;
+	}
+
 	/**
 	 * Get a list of all models.
 	 *
@@ -151,6 +162,31 @@ class YcmModule extends CWebModule
 		}
 	}
 
+	// search and import needed bridge
+	protected function findBridge($name) {
+		$name .= 'Bridge';
+
+		if($this->bridge_aliases !== null) {
+			if(is_array($this->bridge_aliases)) {
+				foreach($this->bridge_aliases as $alias) {
+					// ex: application.bridges.GridBridge
+					$alias .= '.'.$name;
+					
+					if(is_file(Yii::getPathOfAlias($alias).'.php')) {
+						Yii::import($alias);
+						// we need only classes that implements IYCMBridge...
+						if(class_implements($name, $this->bridge_interface)) {
+							return new $name($this, $this->widget_aliases);
+						}
+					}
+				}
+				throw new CException('Bridge '.$name.' not found!');
+			}
+			else throw new CException('bridge_aliases must be an array!');
+		}
+	}
+
+
 	/**
 	 * Create TbActiveForm widget.
 	 *
@@ -165,362 +201,23 @@ class YcmModule extends CWebModule
 			$lang='en';
 		}
 
-		$widget=$this->getAttributeWidget($model,$attribute);
-		switch ($widget) {
-			case 'time':
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '<div class="control-group">';
-					echo $form->labelEx($model,$attribute,array('class'=>'control-label'));
-					echo '<div class="controls">';
-				} else {
-					echo $form->labelEx($model,$attribute);
-				}
-				echo '<div class="input-prepend"><span class="add-on"><i class="icon-time"></i></span>';
-				$options=array(
-					'model'=>$model,
-					'attribute'=>$attribute,
-					'language'=>$lang,
-					'mode'=>'time',
-					'htmlOptions'=>array(
-						'class'=>'size-medium',
-					),
-					'options'=>array(
-						'timeFormat'=>'HH:mm:ss',
-						'showSecond'=>true,
-					),
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				$this->controller->widget($this->name.'.extensions.jui.EJuiDateTimePicker',$options);
-				echo '</div>';
-				echo $form->error($model,$attribute);
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '</div></div>';
-				}
-				break;
+		$widget_name = $this->getAttributeWidget($model,$attribute);
+		
+		$bridge = $this->findBridge(ucfirst($widget_name));
 
-			case 'datetime':
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '<div class="control-group">';
-					echo $form->labelEx($model,$attribute,array('class'=>'control-label'));
-					echo '<div class="controls">';
-				} else {
-					echo $form->labelEx($model,$attribute);
-				}
-				echo '<div class="input-prepend"><span class="add-on"><i class="icon-calendar"></i></span>';
-				$options=array(
-					'model'=>$model,
-					'attribute'=>$attribute,
-					'language'=>$lang,
-					'mode'=>'datetime',
-					'htmlOptions'=>array(
-						'class'=>'size-medium',
-					),
-					'options'=>array(
-						'dateFormat'=>'yy-mm-dd',
-						'timeFormat'=>'HH:mm:ss',
-						'showSecond'=>true,
-						//'stepHour'=>'1',
-						//'stepMinute'=>'10',
-						//'stepSecond'=>'60',
-					),
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				$this->controller->widget($this->name.'.extensions.jui.EJuiDateTimePicker',$options);
-				echo '</div>';
-				echo $form->error($model,$attribute);
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '</div></div>';
-				}
-				break;
+		$bridge->setForm($form)
+			   ->setModel($model)
+			   ->setAttribute($attribute);
 
-			case 'date':
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '<div class="control-group">';
-					echo $form->labelEx($model,$attribute,array('class'=>'control-label'));
-					echo '<div class="controls">';
-				} else {
-					echo $form->labelEx($model,$attribute);
-				}
-				echo '<div class="input-prepend"><span class="add-on"><i class="icon-calendar"></i></span>';
-				$options=array(
-					'model'=>$model,
-					'attribute'=>$attribute,
-					'language'=>$lang,
-					'mode'=>'date',
-					'htmlOptions'=>array(
-						'class'=>'size-medium',
-					),
-					'options'=>array(
-						'dateFormat'=>'yy-mm-dd',
-					),
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				$this->controller->widget($this->name.'.extensions.jui.EJuiDateTimePicker',$options);
-				echo '</div>';
-				echo $form->error($model,$attribute);
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '</div></div>';
-				}
-				break;
+		// $bridge->setForm($form);
+		// $bridge->setModel($model);
+		// $bridge->setAttribute($attribute);
 
-			case 'wysiwyg':
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '<div class="control-group">';
-					echo $form->labelEx($model,$attribute,array('class'=>'control-label'));
-					echo '<div class="controls">';
-				} else {
-					echo $form->labelEx($model,$attribute);
-				}
-				$options=array(
-					'model'=>$model,
-					'attribute'=>$attribute,
-					'options'=>array(
-						'lang'=>$lang,
-						'buttons'=>array(
-							'formatting','|','bold','italic','deleted','|',
-							'unorderedlist','orderedlist','outdent','indent','|',
-							'image','link','|','html',
-						),
-					),
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				if ($this->redactorUpload===true) {
-					$redactorOptions=array(
-						'options'=>array(
-							'imageUpload'=>Yii::app()->createUrl($this->name.'/model/redactorImageUpload',array(
-								'name'=>get_class($model),
-								'attr'=>$attribute)
-							),
-							'imageGetJson'=>Yii::app()->createUrl($this->name.'/model/redactorImageList',array(
-								'name'=>get_class($model),
-								'attr'=>$attribute)
-							),
-							'imageUploadErrorCallback'=>new CJavaScriptExpression(
-								'function(obj,json) { alert(json.error); }'
-							),
-						),
-					);
-					$options=array_merge_recursive($options,$redactorOptions);
-				}
-				$this->controller->widget($this->name.'.extensions.redactor.ERedactorWidget',$options);
-				echo $form->error($model,$attribute);
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '</div></div>';
-				}
-				break;
-
-			case 'textArea':
-				$options=array(
-					'rows'=>5,
-					'cols'=>50,
-					'class'=>'span8',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->textAreaRow($model,$attribute,$options);
-				break;
-
-			case 'textField':
-				$options=array(
-					'class'=>'span5',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->textFieldRow($model,$attribute,$options);
-				break;
-
-			case 'chosen':
-				$options=array(
-					'empty'=>Yii::t('YcmModule.ycm',
-						'Choose {name}',
-						array('{name}'=>$model->getAttributeLabel($attribute))
-					),
-					'class'=>'span5 chosen-select',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				$this->controller->widget($this->name.'.extensions.chosen.EChosenWidget');
-				echo $form->dropDownListRow($model,$attribute,$this->getAttributeChoices($model,$attribute),$options);
-				break;
-
-			case 'chosenMultiple':
-				$options=array(
-					'data-placeholder'=>Yii::t('YcmModule.ycm',
-						'Choose {name}',
-						array('{name}'=>$model->getAttributeLabel($attribute))
-					),
-					'multiple'=>'multiple',
-					'class'=>'span5 chosen-select',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				$this->controller->widget($this->name.'.extensions.chosen.EChosenWidget');
-				echo $form->dropDownListRow($model,$attribute,$this->getAttributeChoices($model,$attribute),$options);
-				break;
-
-			case 'taggable':
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '<div class="control-group">';
-					echo $form->labelEx($model,$attribute,array('class'=>'control-label'));
-					echo '<div class="controls">';
-				} else {
-					echo $form->labelEx($model,$attribute);
-				}
-				$options=array(
-					'name'=>$attribute,
-					'value'=>$model->$attribute->toString(),
-					'url'=>Yii::app()->createUrl($this->name.'/model/suggestTags',array(
-						'name'=>get_class($model),
-						'attr'=>$attribute,
-					)),
-					'multiple'=>true,
-					'mustMatch'=>false,
-					'matchCase'=>false,
-					'htmlOptions'=>array(
-						'size'=>50,
-						'class'=>'span5',
-					),
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				$this->controller->widget('CAutoComplete',$options);
-				echo '<span class="help-inline">'.Yii::t('YcmModule.ycm','Separate words with commas.').'</span>';
-				echo $form->error($model,$attribute);
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '</div></div>';
-				}
-				break;
-
-			case 'dropDown':
-				$options=array(
-					'empty'=>Yii::t('YcmModule.ycm',
-						'Choose {name}',
-						array('{name}'=>$model->getAttributeLabel($attribute))
-					),
-					'class'=>'span5',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->dropDownListRow($model,$attribute,$this->getAttributeChoices($model,$attribute),$options);
-				break;
-
-			case 'typeHead':
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '<div class="control-group">';
-					echo $form->labelEx($model,$attribute,array('class'=>'control-label'));
-					echo '<div class="controls">';
-				} else {
-					echo $form->labelEx($model,$attribute);
-				}
-				$options=array(
-					'model'=>$model,
-					'attribute'=>$attribute,
-					'htmlOptions'=>array(
-						'class'=>'span5',
-						'autocomplete'=>'off',
-					),
-					'options'=>array(
-						'name'=>'typeahead',
-						'source'=>$this->getAttributeChoices($model,$attribute),
-						'matcher'=>"js:function(item) {
-							return ~item.toLowerCase().indexOf(this.query.toLowerCase());
-						}",
-					),
-				);
-				$options=$this->getAttributeOptions($attribute,$options,true);
-				$this->controller->widget('bootstrap.widgets.TbTypeahead',$options);
-				echo $form->error($model,$attribute);
-				if ($form->type==TbActiveForm::TYPE_HORIZONTAL) {
-					echo '</div></div>';
-				}
-				break;
-
-			case 'radioButton':
-				$options=array();
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->radioButtonListRow($model,$attribute,$this->getAttributeChoices($model,$attribute),$options);
-				break;
-
-			case 'boolean':
-				$options=array();
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->checkboxRow($model,$attribute,$options);
-				break;
-
-			case 'password':
-				$options=array(
-					'class'=>'span5',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->passwordFieldRow($model,$attribute,$options);
-				break;
-
-			case 'disabled':
-				$options=array(
-					'class'=>'span5',
-					'disabled'=>true,
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->textFieldRow($model,$attribute,$options);
-				break;
-
-			case 'file':
-				$options=array(
-					'class'=>'span5',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				if (!$model->isNewRecord && !empty($model->$attribute)) {
-					ob_start();
-					echo '<p>';
-					$this->controller->widget('bootstrap.widgets.TbButton',array(
-						'label'=>Yii::t('YcmModule.ycm','Download'),
-						'type'=>'',
-						'url'=>$model->getFileUrl($attribute),
-					));
-					echo '</p>';
-					$html=ob_get_clean();
-					$options['hint']=$html;
-				}
-				echo $form->fileFieldRow($model,$attribute,$options);
-				break;
-
-			case 'image':
-				$options=array(
-					'class'=>'span5',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				if (!$model->isNewRecord && !empty($model->$attribute)) {
-					$modalName='modal-image-'.$attribute;
-					$image=CHtml::image($model->getFileUrl($attribute),Yii::t('YcmModule.ycm','Image'),array(
-						'class'=>'modal-image')
-					);
-					ob_start();
-					$this->controller->beginWidget('bootstrap.widgets.TbModal',array('id'=>$modalName));
-					echo '<div class="modal-header"><a class="close" data-dismiss="modal">&times;</a><h4>';
-					echo Yii::t('YcmModule.ycm','Image preview').'</h4></div>';
-					echo '<div class="modal-body">'.$image.'</div>';
-					$this->controller->endWidget();
-					echo '<p>';
-					$this->controller->widget('bootstrap.widgets.TbButton',array(
-						'label'=>Yii::t('YcmModule.ycm','Preview'),
-						'type'=>'',
-						'htmlOptions'=>array(
-							'data-toggle'=>'modal',
-							'data-target'=>'#'.$modalName,
-						),
-					));
-					echo '</p>';
-					$html=ob_get_clean();
-					$options['hint']=$html;
-				}
-				echo $form->fileFieldRow($model,$attribute,$options);
-				break;
-
-			case 'hide':
-				break;
-
-			default:
-				$options=array(
-					'class'=>'span5',
-				);
-				$options=$this->getAttributeOptions($attribute,$options);
-				echo $form->textFieldRow($model,$attribute,$options);
-				break;
+		if($bridge !== null) {
+			$bridge->renderWidget($widget_name);
 		}
+
+		return;
 	}
 
 	/**
@@ -598,7 +295,7 @@ class YcmModule extends CWebModule
 	 * @param string $attribute Model attribute
 	 * @return array
 	 */
-	private function getAttributeChoices($model,$attribute)
+	public function getAttributeChoices($model,$attribute)
 	{
 		$data=array();
 		$choicesName=(string)$attribute.'Choices';
@@ -618,7 +315,7 @@ class YcmModule extends CWebModule
 	 * @param bool $recursive Merge option arrays recursively
 	 * @return array
 	 */
-	protected function getAttributeOptions($attribute,$options=array(),$recursive=false)
+	public function getAttributeOptions($attribute,$options=array(),$recursive=false)
 	{
 		$optionsName=(string)$attribute.'Options';
 		if (isset($this->attributesWidgets->$optionsName)) {
