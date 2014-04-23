@@ -11,11 +11,20 @@ I tried to do something with that, and as result i created "bridge api" for widg
 
 `See bridges folder.`
 
+
+## Methods available in bridge class ##
+`$this->getContext()` - returns yii-ycm instance
+`$this->getModel()` - returns model
+`$this->getAttribute()` - returns model attribute
+`$this->getController()` - returns controller
+`$this->getForm()` - returns form
+
+
 ## Bridge using examples: ##
 
 For example we want to use [jqueryte](http://www.yiiframework.com/extension/ejqueryte) extension for our model attribute:
 
-1) create JqueryBridge.php in ext.jqueryte.ycm_bridge folder:
+1) create JqueryteBridge.php in ext.jqueryte.ycm_bridge folder:
 ```php
 <?php
 
@@ -26,10 +35,14 @@ For example we want to use [jqueryte](http://www.yiiframework.com/extension/ejqu
 			$model = $this->getModel();
 			$attribute = $this->getAttribute();
 
-			$this->getController()->widget('application.widgets.jqueryte.Jqueryte', [
+			// get widget options
+			$options = $this->getContext()->getAttributeOptions($attribute, [
 				'model' => $model,
 				'attribute' => $attribute
-			]);
+			])
+
+			// render widget
+			$this->getController()->widget('ext.jqueryte.Jqueryte', $options);
 
 		}
 
@@ -41,7 +54,7 @@ For example we want to use [jqueryte](http://www.yiiframework.com/extension/ejqu
     'ycm' => array(
         ...
         'bridge_aliases' => array(
-       		'application.widgets.jqueryte.ycm_bridge',
+       		'ext.jqueryte.ycm_bridge',
         )
     )
 )
@@ -52,3 +65,4 @@ array('node_text','jqueryte')
 ```
 
 4) PROFIT!
+
