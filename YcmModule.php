@@ -29,9 +29,6 @@ class YcmModule extends CWebModule
 
 	public $bridge_interface = 'IYCMBridge';
 	public $bridge_aliases = array();
-	public $widget_aliases = array(
-		'widgets'
-	);
 
 	/**
 	 * Load model.
@@ -114,6 +111,11 @@ class YcmModule extends CWebModule
 		), true);
 	}
 
+	/**
+	 * Get current controller
+	 *
+	 * @return controller object
+	 */
 	public function getController() {
 		return $this->controller;
 	}
@@ -162,7 +164,11 @@ class YcmModule extends CWebModule
 		}
 	}
 
-	// search and import needed bridge
+	/**
+	 * Find and init bridge by name
+	 * @throws CException
+	 * @return Bridge object
+	 */
 	protected function findBridge($name) {
 		$name .= 'Bridge';
 
@@ -176,7 +182,7 @@ class YcmModule extends CWebModule
 						Yii::import($alias);
 						// we need only classes that implements IYCMBridge...
 						if(class_implements($name, $this->bridge_interface)) {
-							return new $name($this, $this->widget_aliases);
+							return new $name($this);
 						}
 					}
 				}
@@ -208,10 +214,6 @@ class YcmModule extends CWebModule
 		$bridge->setForm($form)
 			   ->setModel($model)
 			   ->setAttribute($attribute);
-
-		// $bridge->setForm($form);
-		// $bridge->setModel($model);
-		// $bridge->setAttribute($attribute);
 
 		if($bridge !== null) {
 			$bridge->renderWidget($widget_name);
