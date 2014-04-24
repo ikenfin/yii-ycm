@@ -14,9 +14,13 @@ I tried to do something with that, and as result i created "bridge api" for widg
 
 ## Methods available in bridge class ##
 `$this->getContext()` - returns yii-ycm instance
+
 `$this->getModel()` - returns model
+
 `$this->getAttribute()` - returns model attribute
+
 `$this->getController()` - returns controller
+
 `$this->getForm()` - returns form
 
 
